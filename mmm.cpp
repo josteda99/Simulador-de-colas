@@ -7,14 +7,13 @@
 #include "lcgrand.cpp" /* Encabezado para el generador de numeros aleatorios */
 #include <fstream>
 #include <string>
-#include <thread>
 #include <vector>
 #define LIMITE_COLA 1000 /* Capacidad maxima de la cola */
 #define OCUPADO 1        /* Indicador de Servidor Ocupado */
 #define LIBRE 0          /* Indicador de Servidor Libre */
 
 int sig_tipo_evento, num_clientes_espera, num_esperas_requerido, num_eventos,
-    num_entra_cola, estado_servidor;
+    num_entra_cola, estado_servidor, num_servers;
 float area_num_entra_cola, area_estado_servidor, media_entre_llegadas, media_atencion,
     tiempo_simulacion, tiempo_llegada[LIMITE_COLA + 1], tiempo_ultimo_evento, tiempo_sig_evento[3],
     total_de_esperas, tiempo_i0, tiempo_i1;
@@ -46,8 +45,8 @@ int main(void) /* Funcion Principal */
   num_eventos = 2;
 
   /* Lee los parametros de enrtrada. */
-  fscanf(parametros, "%f %f %d", &media_entre_llegadas, &media_atencion,
-         &num_esperas_requerido);
+  fscanf(parametros, "%f %f %d %d", &media_entre_llegadas, &media_atencion,
+         &num_esperas_requerido, &num_servers);
 
   /* Escribe en el archivo de salida los encabezados del reporte y los parametros iniciales */
   fprintf(resultados, "Sistema de Colas Simple\n\n");
@@ -216,7 +215,8 @@ void salida(void) /* Funcion de Salida. */
     tiempo_sig_evento[2] = tiempo_simulacion + expon(media_atencion);
     // [1] 5 minutes
     // [2] 8 minutes, 1 minutes, 3 minutes, 4 minutes, 5 minutes
-    //
+    // server 1
+    // type_event 2
     // a * b *
     /* Mueve cada cliente en la cola ( si los hay ) una posicion hacia adelante */
     for (i = 1; i <= num_entra_cola; ++i)
