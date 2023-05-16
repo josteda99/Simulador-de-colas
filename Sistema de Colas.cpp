@@ -7,16 +7,17 @@
 #include "lcgrand.cpp" /* Encabezado para el generador de numeros aleatorios */
 #include <fstream>
 #include <string>
-#include <thread>
+#include <vector>
 #define LIMITE_COLA 1000 /* Capacidad maxima de la cola */
 #define OCUPADO 1        /* Indicador de Servidor Ocupado */
 #define LIBRE 0          /* Indicador de Servidor Libre */
 
 int sig_tipo_evento, num_clientes_espera, num_esperas_requerido, num_eventos,
-    num_entra_cola, estado_servidor;
+    num_entra_cola, estado_servidor, num_servers;
 float area_num_entra_cola, area_estado_servidor, media_entre_llegadas, media_atencion,
     tiempo_simulacion, tiempo_llegada[LIMITE_COLA + 1], tiempo_ultimo_evento, tiempo_sig_evento[3],
     total_de_esperas, tiempo_i0, tiempo_i1;
+
 FILE *parametros, *resultados;
 
 void inicializar(void);
@@ -44,8 +45,8 @@ int main(void) /* Funcion Principal */
   num_eventos = 2;
 
   /* Lee los parametros de enrtrada. */
-  fscanf(parametros, "%f %f %d", &media_entre_llegadas, &media_atencion,
-         &num_esperas_requerido);
+  fscanf(parametros, "%f %f %d %d", &media_entre_llegadas, &media_atencion,
+         &num_esperas_requerido, &num_servers);
 
   /* Escribe en el archivo de salida los encabezados del reporte y los parametros iniciales */
   fprintf(resultados, "Sistema de Colas Simple\n\n");
@@ -73,6 +74,7 @@ int main(void) /* Funcion Principal */
       llegada();
       break;
     case 2:
+      /* TODO: Revisar como hacer que sea por medio de hilos y tener control de estos */
       salida();
       break;
     }
@@ -106,11 +108,13 @@ void inicializar(void) /* Funcion de inicializacion. */
   tiempo_i1 = 0.0;
 
   /* Inicializa la lista de eventos. Ya que no hay clientes, el evento salida (terminacion del servicio) no se tiene en cuenta */
+  /* La posicion 1 son los eventos de llegadas de clientes */
+  /* La posicion 2 es la terminacion de la simulacion */
   tiempo_sig_evento[1] = tiempo_simulacion + expon(media_entre_llegadas);
   tiempo_sig_evento[2] = 1.0e+30;
 }
 
-void controltiempo(void) /* Funcion controltiempo */
+void controltiempo(void) /* Funcion controltiempo, para determinar que evento sigue */
 {
   int i;
   float min_tiempo_sig_evento = 1.0e+29;
@@ -118,12 +122,13 @@ void controltiempo(void) /* Funcion controltiempo */
 
   /*  Determina el tipo de evento del evento que debe ocurrir. */
   for (i = 1; i <= num_eventos; ++i)
+  {
     if (tiempo_sig_evento[i] < min_tiempo_sig_evento)
     {
       min_tiempo_sig_evento = tiempo_sig_evento[i];
       sig_tipo_evento = i;
     }
-
+  }
   /* Revisa si la lista de eventos esta vacia. */
   if (sig_tipo_evento == 0)
   {
@@ -133,6 +138,7 @@ void controltiempo(void) /* Funcion controltiempo */
   }
 
   /* TLa lista de eventos no esta vacia, adelanta el reloj de la simulacion. */
+  /* t0 -> t1 */
   tiempo_simulacion = min_tiempo_sig_evento;
 }
 
@@ -143,10 +149,11 @@ void llegada(void) /* Funcion de llegada */
   /* Programa la siguiente llegada. */
   tiempo_sig_evento[1] = tiempo_simulacion + expon(media_entre_llegadas);
 
+  /* TODO: Revisar si todos los hilos estan ocupados */
   /* Reisa si el servidor esta OCUPADO. */
   if (estado_servidor == OCUPADO)
   {
-    /* Sservidor OCUPADO, aumenta el numero de clientes en cola */
+    /* Servidor OCUPADO, aumenta el numero de clientes en cola */
     ++num_entra_cola;
 
     /* Verifica si hay condici�n de desbordamiento */
@@ -158,18 +165,19 @@ void llegada(void) /* Funcion de llegada */
       exit(2);
     }
 
-    /* Todavia hay espacio en la cola, se almacena el tiempo de llegada del cliente en el ( nuevo ) fin de tiempo_llegada */
+    /* Todavia hay espacio en la cola, se almacena el tiempo de llegada del cliente en el ( nuevo ) final de la cola */
     tiempo_llegada[num_entra_cola] = tiempo_simulacion;
   }
   else
   {
-    /*  El servidor esta LIBRE, por lo tanto el cliente que llega tiene tiempo de eespera=0
+    /*  El servidor esta LIBRE, por lo tanto el cliente que llega tiene tiempo de espera=0
        (Las siguientes dos lineas del programa son para claridad, y no afectan
        el reultado de la simulacion ) */
     espera = 0.0;
     total_de_esperas += espera;
 
     /* Incrementa el numero de clientes en espera, y pasa el servidor a ocupado */
+    /* Esta variables puede ser escrita por servidores, teber cuidado */
     ++num_clientes_espera;
     estado_servidor = OCUPADO;
 
@@ -197,7 +205,7 @@ void salida(void) /* Funcion de Salida. */
     /* La cola no esta vacia, disminuye el numero de clientes en cola. */
     --num_entra_cola;
 
-    /*Calcula la espera del cliente que esta siendo atendido y
+    /* Calcula la espera del cliente que esta siendo atendido y
     actualiza el acumulador de espera */
     espera = tiempo_simulacion - tiempo_llegada[1];
     total_de_esperas += espera;
@@ -205,7 +213,11 @@ void salida(void) /* Funcion de Salida. */
     /*Incrementa el numero de clientes en espera, y programa la salida. */
     ++num_clientes_espera;
     tiempo_sig_evento[2] = tiempo_simulacion + expon(media_atencion);
-
+    // [1] 5 minutes
+    // [2] 8 minutes, 1 minutes, 3 minutes, 4 minutes, 5 minutes
+    // server 1
+    // type_event 2
+    // a * b *
     /* Mueve cada cliente en la cola ( si los hay ) una posicion hacia adelante */
     for (i = 1; i <= num_entra_cola; ++i)
       tiempo_llegada[i] = tiempo_llegada[i + 1];
