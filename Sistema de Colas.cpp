@@ -7,15 +7,16 @@
 #include "lcgrand.cpp" /* Encabezado para el generador de numeros aleatorios */
 #include <fstream>
 #include <string>
-#define LIMITE_COLA 100 /* Capacidad maxima de la cola */
-#define OCUPADO 1       /* Indicador de Servidor Ocupado */
-#define LIBRE 0         /* Indicador de Servidor Libre */
+#include <thread>
+#define LIMITE_COLA 1000 /* Capacidad maxima de la cola */
+#define OCUPADO 1        /* Indicador de Servidor Ocupado */
+#define LIBRE 0          /* Indicador de Servidor Libre */
 
 int sig_tipo_evento, num_clientes_espera, num_esperas_requerido, num_eventos,
     num_entra_cola, estado_servidor;
 float area_num_entra_cola, area_estado_servidor, media_entre_llegadas, media_atencion,
     tiempo_simulacion, tiempo_llegada[LIMITE_COLA + 1], tiempo_ultimo_evento, tiempo_sig_evento[3],
-    total_de_esperas;
+    total_de_esperas, tiempo_i0, tiempo_i1;
 FILE *parametros, *resultados;
 
 void inicializar(void);
@@ -30,7 +31,6 @@ using namespace std;
 int main(void) /* Funcion Principal */
 {
   /* Abre los archivos de entrada y salida */
-
   parametros = fopen("../param.txt", "r");
   resultados = fopen("result.txt", "w");
 
@@ -55,24 +55,18 @@ int main(void) /* Funcion Principal */
   fprintf(resultados, "Numero de clientes%14d\n\n", num_esperas_requerido);
 
   /* iInicializa la simulacion. */
-
   inicializar();
 
   /* Corre la simulacion mientras no se llegue al numero de clientes especificaco en el archivo de entrada*/
-
   while (num_clientes_espera < num_esperas_requerido)
   {
-
     /* Determina el siguiente evento */
-
     controltiempo();
 
     /* Actualiza los acumuladores estadisticos de tiempo promedio */
-
     actualizar_estad_prom_tiempo();
 
     /* Invoca la funcion del evento adecuado. */
-
     switch (sig_tipo_evento)
     {
     case 1:
@@ -85,7 +79,6 @@ int main(void) /* Funcion Principal */
   }
 
   /* Invoca el generador de reportes y termina la simulacion. */
-
   reportes();
 
   fclose(parametros);
@@ -97,25 +90,22 @@ int main(void) /* Funcion Principal */
 void inicializar(void) /* Funcion de inicializacion. */
 {
   /* Inicializa el reloj de la simulacion. */
-
   tiempo_simulacion = 0.0;
 
   /* Inicializa las variables de estado */
-
   estado_servidor = LIBRE;
   num_entra_cola = 0;
   tiempo_ultimo_evento = 0.0;
 
   /* Inicializa los contadores estadisticos. */
-
   num_clientes_espera = 0;
   total_de_esperas = 0.0;
   area_num_entra_cola = 0.0;
   area_estado_servidor = 0.0;
+  tiempo_i0 = 0.0;
+  tiempo_i1 = 0.0;
 
-  /* Inicializa la lista de eventos. Ya que no hay clientes, el evento salida
-     (terminacion del servicio) no se tiene en cuenta */
-
+  /* Inicializa la lista de eventos. Ya que no hay clientes, el evento salida (terminacion del servicio) no se tiene en cuenta */
   tiempo_sig_evento[1] = tiempo_simulacion + expon(media_entre_llegadas);
   tiempo_sig_evento[2] = 1.0e+30;
 }
@@ -124,11 +114,9 @@ void controltiempo(void) /* Funcion controltiempo */
 {
   int i;
   float min_tiempo_sig_evento = 1.0e+29;
-
   sig_tipo_evento = 0;
 
   /*  Determina el tipo de evento del evento que debe ocurrir. */
-
   for (i = 1; i <= num_eventos; ++i)
     if (tiempo_sig_evento[i] < min_tiempo_sig_evento)
     {
@@ -137,18 +125,14 @@ void controltiempo(void) /* Funcion controltiempo */
     }
 
   /* Revisa si la lista de eventos esta vacia. */
-
   if (sig_tipo_evento == 0)
   {
-
     /* La lista de eventos esta vacia, se detiene la simulacion. */
-
     fprintf(resultados, "\nLa lista de eventos esta vacia %f", tiempo_simulacion);
     exit(1);
   }
 
   /* TLa lista de eventos no esta vacia, adelanta el reloj de la simulacion. */
-
   tiempo_simulacion = min_tiempo_sig_evento;
 }
 
@@ -157,43 +141,31 @@ void llegada(void) /* Funcion de llegada */
   float espera;
 
   /* Programa la siguiente llegada. */
-
   tiempo_sig_evento[1] = tiempo_simulacion + expon(media_entre_llegadas);
 
   /* Reisa si el servidor esta OCUPADO. */
-
   if (estado_servidor == OCUPADO)
   {
-
     /* Sservidor OCUPADO, aumenta el numero de clientes en cola */
-
     ++num_entra_cola;
 
     /* Verifica si hay condici�n de desbordamiento */
-
     if (num_entra_cola > LIMITE_COLA)
     {
-
       /* Se ha desbordado la cola, detiene la simulacion */
-
       fprintf(resultados, "\nDesbordamiento del arreglo tiempo_llegada a la hora");
       fprintf(resultados, "%f", tiempo_simulacion);
       exit(2);
     }
 
-    /* Todavia hay espacio en la cola, se almacena el tiempo de llegada del
-      cliente en el ( nuevo ) fin de tiempo_llegada */
-
+    /* Todavia hay espacio en la cola, se almacena el tiempo de llegada del cliente en el ( nuevo ) fin de tiempo_llegada */
     tiempo_llegada[num_entra_cola] = tiempo_simulacion;
   }
-
   else
   {
-
     /*  El servidor esta LIBRE, por lo tanto el cliente que llega tiene tiempo de eespera=0
        (Las siguientes dos lineas del programa son para claridad, y no afectan
        el reultado de la simulacion ) */
-
     espera = 0.0;
     total_de_esperas += espera;
 
@@ -202,7 +174,6 @@ void llegada(void) /* Funcion de llegada */
     estado_servidor = OCUPADO;
 
     /* Programa una salida ( servicio terminado ). */
-
     tiempo_sig_evento[2] = tiempo_simulacion + expon(media_atencion);
   }
 }
@@ -213,16 +184,13 @@ void salida(void) /* Funcion de Salida. */
   float espera;
 
   /* Revisa si la cola esta vacia */
-
   if (num_entra_cola == 0)
   {
-
     /* La cola esta vacia, pasa el servidor a LIBRE y
     no considera el evento de salida*/
     estado_servidor = LIBRE;
     tiempo_sig_evento[2] = 1.0e+30;
   }
-
   else
   {
 
@@ -231,7 +199,6 @@ void salida(void) /* Funcion de Salida. */
 
     /*Calcula la espera del cliente que esta siendo atendido y
     actualiza el acumulador de espera */
-
     espera = tiempo_simulacion - tiempo_llegada[1];
     total_de_esperas += espera;
 
@@ -264,7 +231,6 @@ void actualizar_estad_prom_tiempo(void) /* Actualiza los acumuladores de
 
   /* Calcula el tiempo desde el ultimo evento, y actualiza el marcador
     del ultimo evento */
-
   time_since_last_event = tiempo_simulacion - tiempo_ultimo_evento;
   tiempo_ultimo_evento = tiempo_simulacion;
 
@@ -278,6 +244,5 @@ void actualizar_estad_prom_tiempo(void) /* Actualiza los acumuladores de
 float expon(float media) /* Funcion generadora de la exponencias */
 {
   /* Retorna una variable aleatoria exponencial con media "media"*/
-
   return -media * log(lcgrand(1));
 }
