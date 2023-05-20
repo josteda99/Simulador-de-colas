@@ -16,7 +16,7 @@
 int sig_tipo_evento, num_clientes_espera, num_esperas_requerido, num_eventos,
     num_entra_cola, estado_servidor;
 float area_num_entra_cola, area_estado_servidor, media_entre_llegadas, media_atencion,
-    tiempo_simulacion, tiempo_llegada[LIMITE_COLA + 1], tiempo_ultimo_evento, tiempo_sig_evento[3],
+    tiempo_simulacion, queue_arrivals[LIMITE_COLA + 1], tiempo_ultimo_evento, tiempo_sig_evento[3],
     total_de_esperas, tiempo_i0, tiempo_i1;
 
 FILE *parametros, *resultados;
@@ -96,7 +96,7 @@ void inicializar(void) /* Funcion de inicializacion. */
   tiempo_simulacion = 0.0;
 
   /* Inicializa las variables de estado */
-  estado_servidor = LIBRE;
+  estado_servidor = OCUPADO;
   num_entra_cola = 0;
   tiempo_ultimo_evento = 0.0;
 
@@ -161,17 +161,17 @@ void llegada(void) /* Funcion de llegada */
     if (num_entra_cola > LIMITE_COLA)
     {
       /* Se ha desbordado la cola, detiene la simulacion */
-      fprintf(resultados, "\nDesbordamiento del arreglo tiempo_llegada a la hora");
+      fprintf(resultados, "\nDesbordamiento del arreglo queue_arrivals a la hora");
       fprintf(resultados, "%f", tiempo_simulacion);
       exit(2);
     }
 
     /* Todavia hay espacio en la cola, se almacena el tiempo de llegada del cliente en el ( nuevo ) final de la cola */
-    tiempo_llegada[num_entra_cola] = tiempo_simulacion;
+    queue_arrivals[num_entra_cola] = tiempo_simulacion;
   }
   else
   {
-    /*  El servidor esta LIBRE, por lo tanto el cliente que llega tiene tiempo de espera=0
+    /*  El servidor esta IDLE, por lo tanto el cliente que llega tiene tiempo de espera=0
        (Las siguientes dos lineas del programa son para claridad, y no afectan
        el reultado de la simulacion ) */
     espera = 0.0;
@@ -195,7 +195,7 @@ void salida(void) /* Funcion de Salida. */
   /* Revisa si la cola esta vacia */
   if (num_entra_cola == 0)
   {
-    /* La cola esta vacia, pasa el servidor a LIBRE y
+    /* La cola esta vacia, pasa el servidor a IDLE y
     no considera el evento de salida*/
     estado_servidor = LIBRE;
     tiempo_sig_evento[2] = 1.0e+30;
@@ -208,7 +208,7 @@ void salida(void) /* Funcion de Salida. */
 
     /* Calcula la espera del cliente que esta siendo atendido y
     actualiza el acumulador de espera */
-    espera = tiempo_simulacion - tiempo_llegada[1];
+    espera = tiempo_simulacion - queue_arrivals[1];
     total_de_esperas += espera;
 
     /*Incrementa el numero de clientes en espera, y programa la salida. */
@@ -220,7 +220,7 @@ void salida(void) /* Funcion de Salida. */
     // a * b *
     /* Mueve cada cliente en la cola ( si los hay ) una posicion hacia adelante */
     for (i = 1; i <= num_entra_cola; ++i)
-      tiempo_llegada[i] = tiempo_llegada[i + 1];
+      queue_arrivals[i] = queue_arrivals[i + 1];
   }
 }
 

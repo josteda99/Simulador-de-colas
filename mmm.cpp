@@ -1,5 +1,4 @@
-/* Definiciones externas para el sistema de colas simple */
-
+/* Definiciones externas para el sistema de colas simple sistema (M/M/m) */
 #include "iostream"
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,31 +7,49 @@
 #include <fstream>
 #include <string>
 #include <vector>
-#define LIMITE_COLA 1000 /* Capacidad maxima de la cola */
-#define OCUPADO 1        /* Indicador de Servidor Ocupado */
-#define LIBRE 0          /* Indicador de Servidor Libre */
+#include <algorithm>
+#include <numeric>
 
-int sig_tipo_evento, num_clientes_espera, num_esperas_requerido, num_eventos,
-    num_entra_cola, estado_servidor, num_servers;
-float area_num_entra_cola, area_estado_servidor, media_entre_llegadas, media_atencion,
-    tiempo_simulacion, tiempo_llegada[LIMITE_COLA + 1], tiempo_ultimo_evento, tiempo_sig_evento[3],
-    total_de_esperas, tiempo_i0, tiempo_i1;
-
-FILE *parametros, *resultados;
-
-void inicializar(void);
-void controltiempo(void);
-void llegada(void);
-void salida(void);
-void reportes(void);
-void actualizar_estad_prom_tiempo(void);
-float expon(float mean);
+#define QUEUE_LIMIT 1000 /* Capacidad maxima de la cola */
+#define NULL_INDEX -1    /* Indice Nulo, no hay coincidencias */
+#define BUSSY 1          /* Indicador de Servidor Ocupado */
+#define IDLE 0           /* Indicador de Servidor Libre */
 
 using namespace std;
+
+int sig_tipo_evento, num_clientes_espera, num_esperas_requerido, num_eventos,
+    num_entra_cola, num_servers, estado_servidor;
+
+/* Estados de los servidores */
+vector<int> servers_status;
+
+float area_num_entra_cola, media_entre_llegadas, media_atencion,
+    tiempo_simulacion, tiempo_ultimo_evento, total_de_esperas;
+
+vector<double> tiempo_sig_evento, area_estado_servidor;
+
+vector<float> queue_arrivals(QUEUE_LIMIT + 1);
+FILE *parametros, *resultados;
+
+void actualizar_estad_prom_tiempo(void);
+int get_idle_server(void);
+void controltiempo(void);
+float expon(float mean);
+void inicializar(void);
+void reportes(void);
+void llegada(void);
+void salida(void);
+template <typename T>
+void print_vector(vector<T>);
+/*
+ * Crear una funcion que nos retorne el indice de el siguiente eveto en el vector
+    - Retorna un valor entre 0 y longitud del vector que es (num_eventos + num_servers - 1)
+*/
+
 int main(void) /* Funcion Principal */
 {
   /* Abre los archivos de entrada y salida */
-  parametros = fopen("../param.txt", "r");
+  parametros = fopen("../param2.txt", "r");
   resultados = fopen("result.txt", "w");
 
   if (parametros == NULL)
@@ -41,19 +58,17 @@ int main(void) /* Funcion Principal */
     return 1;
   }
 
-  /* Especifica el numero de eventos para la funcion controltiempo. */
-  num_eventos = 2;
-
   /* Lee los parametros de enrtrada. */
   fscanf(parametros, "%f %f %d %d", &media_entre_llegadas, &media_atencion,
          &num_esperas_requerido, &num_servers);
 
   /* Escribe en el archivo de salida los encabezados del reporte y los parametros iniciales */
-  fprintf(resultados, "Sistema de Colas Simple\n\n");
+  fprintf(resultados, "Sistema de Colas Simple Modelo (M/M/c)\n\n");
   fprintf(resultados, "Tiempo promedio de llegada%11.3f minutos\n\n",
           media_entre_llegadas);
   fprintf(resultados, "Tiempo promedio de atencion%16.3f minutos\n\n", media_atencion);
   fprintf(resultados, "Numero de clientes%14d\n\n", num_esperas_requerido);
+  fprintf(resultados, "Numero de servidores%12d\n\n", num_servers);
 
   /* iInicializa la simulacion. */
   inicializar();
@@ -61,6 +76,14 @@ int main(void) /* Funcion Principal */
   /* Corre la simulacion mientras no se llegue al numero de clientes especificaco en el archivo de entrada*/
   while (num_clientes_espera < num_esperas_requerido)
   {
+    // cout << "Servers: ";
+    // print_vector(servers_status);
+
+    // cout << endl
+    //      << "Tiempo eventos: ";
+    // print_vector(tiempo_sig_evento);
+    // cout << endl
+    //      << "Total espera: " << total_de_esperas << endl;
     /* Determina el siguiente evento */
     controltiempo();
 
@@ -70,11 +93,13 @@ int main(void) /* Funcion Principal */
     /* Invoca la funcion del evento adecuado. */
     switch (sig_tipo_evento)
     {
-    case 1:
+    case -1:
+      // Si entra aca algo fallo... ya que no hay un evento programado para eso
+      return 1;
+    case 0:
       llegada();
       break;
-    case 2:
-      /* TODO: Revisar como hacer que sea por medio de hilos y tener control de estos */
+    default:
       salida();
       break;
     }
@@ -86,16 +111,23 @@ int main(void) /* Funcion Principal */
   fclose(parametros);
   fclose(resultados);
 
+  tiempo_sig_evento.clear();
+  servers_status.clear();
+  queue_arrivals.clear();
+  area_estado_servidor.clear();
   return 0;
 }
 
 void inicializar(void) /* Funcion de inicializacion. */
 {
+  /* Especifica el numero de eventos para la funcion controltiempo. */
+  num_eventos = num_servers + 1;
+
   /* Inicializa el reloj de la simulacion. */
   tiempo_simulacion = 0.0;
 
   /* Inicializa las variables de estado */
-  estado_servidor = LIBRE;
+  servers_status.insert(servers_status.begin(), num_servers, IDLE);
   num_entra_cola = 0;
   tiempo_ultimo_evento = 0.0;
 
@@ -103,25 +135,29 @@ void inicializar(void) /* Funcion de inicializacion. */
   num_clientes_espera = 0;
   total_de_esperas = 0.0;
   area_num_entra_cola = 0.0;
-  area_estado_servidor = 0.0;
-  tiempo_i0 = 0.0;
-  tiempo_i1 = 0.0;
+  area_estado_servidor.insert(area_estado_servidor.begin(), num_servers, 0.0);
 
   /* Inicializa la lista de eventos. Ya que no hay clientes, el evento salida (terminacion del servicio) no se tiene en cuenta */
   /* La posicion 1 son los eventos de llegadas de clientes */
   /* La posicion 2 es la terminacion de la simulacion */
-  tiempo_sig_evento[1] = tiempo_simulacion + expon(media_entre_llegadas);
-  tiempo_sig_evento[2] = 1.0e+30;
+  tiempo_sig_evento.insert(tiempo_sig_evento.begin(), num_eventos, 1.0e+30);
+  tiempo_sig_evento[0] = tiempo_simulacion + expon(media_entre_llegadas);
 }
 
 void controltiempo(void) /* Funcion controltiempo, para determinar que evento sigue */
 {
+
   int i;
   float min_tiempo_sig_evento = 1.0e+29;
-  sig_tipo_evento = 0;
+  sig_tipo_evento = NULL_INDEX;
 
   /*  Determina el tipo de evento del evento que debe ocurrir. */
-  for (i = 1; i <= num_eventos; ++i)
+  // [1] 15 minutes
+  // [2] 8 minutes, 9 minutes, 6 minutes, 7.5 minutes, 6 minutes
+  // server 1
+  // type_event 2
+  // a * b *
+  for (i = 0; i < num_eventos; ++i)
   {
     if (tiempo_sig_evento[i] < min_tiempo_sig_evento)
     {
@@ -130,7 +166,7 @@ void controltiempo(void) /* Funcion controltiempo, para determinar que evento si
     }
   }
   /* Revisa si la lista de eventos esta vacia. */
-  if (sig_tipo_evento == 0)
+  if (sig_tipo_evento == NULL_INDEX)
   {
     /* La lista de eventos esta vacia, se detiene la simulacion. */
     fprintf(resultados, "\nLa lista de eventos esta vacia %f", tiempo_simulacion);
@@ -147,80 +183,74 @@ void llegada(void) /* Funcion de llegada */
   float espera;
 
   /* Programa la siguiente llegada. */
-  tiempo_sig_evento[1] = tiempo_simulacion + expon(media_entre_llegadas);
+  tiempo_sig_evento[0] = tiempo_simulacion + expon(media_entre_llegadas);
 
   /* TODO: Revisar si todos los hilos estan ocupados */
   /* Reisa si el servidor esta OCUPADO. */
-  if (estado_servidor == OCUPADO)
+  int idle_server = get_idle_server();
+  if (idle_server == NULL_INDEX)
   {
     /* Servidor OCUPADO, aumenta el numero de clientes en cola */
     ++num_entra_cola;
 
     /* Verifica si hay condici�n de desbordamiento */
-    if (num_entra_cola > LIMITE_COLA)
+    if (num_entra_cola > QUEUE_LIMIT)
     {
       /* Se ha desbordado la cola, detiene la simulacion */
-      fprintf(resultados, "\nDesbordamiento del arreglo tiempo_llegada a la hora");
+      fprintf(resultados, "\nDesbordamiento del arreglo queue_arrivals a la hora");
       fprintf(resultados, "%f", tiempo_simulacion);
       exit(2);
     }
 
     /* Todavia hay espacio en la cola, se almacena el tiempo de llegada del cliente en el ( nuevo ) final de la cola */
-    tiempo_llegada[num_entra_cola] = tiempo_simulacion;
+    queue_arrivals.push_back(tiempo_simulacion);
   }
   else
   {
-    /*  El servidor esta LIBRE, por lo tanto el cliente que llega tiene tiempo de espera=0
+    /*  El servidor esta IDLE, por lo tanto el cliente que llega tiene tiempo de espera=0
        (Las siguientes dos lineas del programa son para claridad, y no afectan
        el reultado de la simulacion ) */
     espera = 0.0;
     total_de_esperas += espera;
 
     /* Incrementa el numero de clientes en espera, y pasa el servidor a ocupado */
-    /* Esta variables puede ser escrita por servidores, teber cuidado */
-    ++num_clientes_espera;
-    estado_servidor = OCUPADO;
+    /* Llego y estoy siendo atendido luego salgo */
+    ++num_clientes_espera; // Incrementar la cantidad de clientes que han sido atendidos
+    servers_status[idle_server] = BUSSY;
 
-    /* Programa una salida ( servicio terminado ). */
-    tiempo_sig_evento[2] = tiempo_simulacion + expon(media_atencion);
+    /* Programa una salida para el servidor que se acaba de ocupar( servicio terminado ). */
+    /* TODO: Revisar como manejar  */
+    tiempo_sig_evento[idle_server + 1] = tiempo_simulacion + expon(media_atencion);
   }
 }
 
 void salida(void) /* Funcion de Salida. */
 {
-  int i;
+  int server = sig_tipo_evento - 1;
   float espera;
 
   /* Revisa si la cola esta vacia */
   if (num_entra_cola == 0)
   {
-    /* La cola esta vacia, pasa el servidor a LIBRE y
+    /* La cola esta vacia, pasa el servidor a IDLE y
     no considera el evento de salida*/
-    estado_servidor = LIBRE;
-    tiempo_sig_evento[2] = 1.0e+30;
+    servers_status[server] = IDLE;
+    tiempo_sig_evento[sig_tipo_evento] = 1.0e+30;
   }
   else
   {
-
     /* La cola no esta vacia, disminuye el numero de clientes en cola. */
     --num_entra_cola;
 
     /* Calcula la espera del cliente que esta siendo atendido y
-    actualiza el acumulador de espera */
-    espera = tiempo_simulacion - tiempo_llegada[1];
+        actualiza el acumulador de espera */
+    espera = tiempo_simulacion - queue_arrivals.front();
+    queue_arrivals.erase(queue_arrivals.begin());
     total_de_esperas += espera;
 
     /*Incrementa el numero de clientes en espera, y programa la salida. */
-    ++num_clientes_espera;
-    tiempo_sig_evento[2] = tiempo_simulacion + expon(media_atencion);
-    // [1] 5 minutes
-    // [2] 8 minutes, 1 minutes, 3 minutes, 4 minutes, 5 minutes
-    // server 1
-    // type_event 2
-    // a * b *
-    /* Mueve cada cliente en la cola ( si los hay ) una posicion hacia adelante */
-    for (i = 1; i <= num_entra_cola; ++i)
-      tiempo_llegada[i] = tiempo_llegada[i + 1];
+    ++num_clientes_espera; // Aumenta el numero de clientes atendidos
+    tiempo_sig_evento[server] = tiempo_simulacion + expon(media_atencion);
   }
 }
 
@@ -231,13 +261,17 @@ void reportes(void) /* Funcion generadora de reportes. */
           total_de_esperas / num_clientes_espera);
   fprintf(resultados, "Numero promedio en cola%10.3f\n\n",
           area_num_entra_cola / tiempo_simulacion);
-  fprintf(resultados, "Uso del servidor%15.3f\n\n",
-          area_estado_servidor / tiempo_simulacion);
+  // Ahora este debe ser el promedio
+  for (int i = 0; i < area_estado_servidor.size(); i++)
+  {
+    fprintf(resultados, "Uso del servidor %d: %15.3f\n\n", i, area_estado_servidor[i] / tiempo_simulacion);
+  }
+  double avarage_servers = accumulate(area_estado_servidor.begin(), area_estado_servidor.end(), 0.0) / area_estado_servidor.size();
+  fprintf(resultados, "Uso de los servidores: %15.3f\n\n", avarage_servers / tiempo_simulacion);
   fprintf(resultados, "Tiempo de terminacion de la simulacion%12.3f minutos", tiempo_simulacion);
 }
 
-void actualizar_estad_prom_tiempo(void) /* Actualiza los acumuladores de
-                           area para las estadisticas de tiempo promedio. */
+void actualizar_estad_prom_tiempo(void) /* Actualiza los acumuladores de area para las estadisticas de tiempo promedio. */
 {
   float time_since_last_event;
 
@@ -249,12 +283,40 @@ void actualizar_estad_prom_tiempo(void) /* Actualiza los acumuladores de
   /* Actualiza el area bajo la funcion de numero_en_cola */
   area_num_entra_cola += num_entra_cola * time_since_last_event;
 
-  /*Actualiza el area bajo la funcion indicadora de servidor ocupado*/
-  area_estado_servidor += estado_servidor * time_since_last_event;
+  /* Actualiza el area bajo la funcion indicadora de servidor ocupado */
+  /* Hacer esto para cada servidor */
+  for (int index = 0; index < servers_status.size(); index++)
+  {
+    area_estado_servidor[index] += servers_status[index] * time_since_last_event;
+  }
 }
 
 float expon(float media) /* Funcion generadora de la exponencias */
 {
   /* Retorna una variable aleatoria exponencial con media "media"*/
   return -media * log(lcgrand(1));
+}
+
+/* funcion que busca el primer servidor que este desocupado*/
+int get_idle_server()
+{
+  int index;
+  int state = IDLE;
+  auto result = find(servers_status.begin(), servers_status.end(), state);
+  if (result != servers_status.end())
+  {
+    index = result - servers_status.begin();
+    return index;
+  }
+  return -1;
+}
+
+template <typename T>
+void print_vector(vector<T> test)
+{
+  for (auto it = test.begin(); it != test.end(); it++)
+  {
+    cout << "Status: " << *it << ", ";
+  }
+  cout << endl;
 }
