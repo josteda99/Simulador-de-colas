@@ -6,24 +6,24 @@ Tiempo promedio de atencion           6.100 minutos
 
 Numero de clientes           100
 
-Numero de servidores           5
+Numero de servidores           4
 
 
 
-Espera promedio en la cola      0.000 minutos
+Espera promedio en la cola     4.7756 minutos
 
-Numero promedio en cola     0.000
+Numero promedio en cola      0.0040
 
-Uso del servidor 0:           0.379
+Uso del servidor 0:          0.3803
 
-Uso del servidor 1:           0.178
+Uso del servidor 1:          0.1788
 
-Uso del servidor 2:           0.085
+Uso del servidor 2:          0.0853
 
-Uso del servidor 3:           0.014
+Uso del servidor 3:          0.0140
 
-Uso del servidor 4:           0.008
+Uso de los servidores:       0.1646
 
-Uso de los servidores:           0.133
+Erlang-C:                    0.0056
 
-Tiempo de terminacion de la simulacion     880.779 minutos
+Tiempo de terminacion de la simulacion    877.2918 minutos

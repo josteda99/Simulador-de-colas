@@ -18,15 +18,15 @@
 using namespace std;
 
 int sig_tipo_evento, num_clientes_espera, num_esperas_requerido, num_eventos,
-    num_entra_cola, num_servers, estado_servidor;
+    num_entra_cola, num_servers;
 
 /* Estados de los servidores */
 vector<int> servers_status;
 
 float area_num_entra_cola, media_entre_llegadas, media_atencion,
-    tiempo_simulacion, tiempo_ultimo_evento, total_de_esperas;
+    tiempo_simulacion, tiempo_ultimo_evento, total_de_esperas, erlang;
 
-vector<double> tiempo_sig_evento, area_estado_servidor;
+vector<double> tiempo_sig_evento, area_estado_servidores;
 
 vector<float> queue_arrivals(QUEUE_LIMIT + 1);
 FILE *parametros, *resultados;
@@ -41,10 +41,6 @@ void llegada(void);
 void salida(void);
 template <typename T>
 void print_vector(vector<T>);
-/*
- * Crear una funcion que nos retorne el indice de el siguiente eveto en el vector
-    - Retorna un valor entre 0 y longitud del vector que es (num_eventos + num_servers - 1)
-*/
 
 int main(void) /* Funcion Principal */
 {
@@ -114,7 +110,7 @@ int main(void) /* Funcion Principal */
   tiempo_sig_evento.clear();
   servers_status.clear();
   queue_arrivals.clear();
-  area_estado_servidor.clear();
+  area_estado_servidores.clear();
   return 0;
 }
 
@@ -132,10 +128,11 @@ void inicializar(void) /* Funcion de inicializacion. */
   tiempo_ultimo_evento = 0.0;
 
   /* Inicializa los contadores estadisticos. */
+  erlang = 0.0;
   num_clientes_espera = 0;
   total_de_esperas = 0.0;
   area_num_entra_cola = 0.0;
-  area_estado_servidor.insert(area_estado_servidor.begin(), num_servers, 0.0);
+  area_estado_servidores.insert(area_estado_servidores.begin(), num_servers, 0.0);
 
   /* Inicializa la lista de eventos. Ya que no hay clientes, el evento salida (terminacion del servicio) no se tiene en cuenta */
   /* La posicion 1 son los eventos de llegadas de clientes */
@@ -152,11 +149,6 @@ void controltiempo(void) /* Funcion controltiempo, para determinar que evento si
   sig_tipo_evento = NULL_INDEX;
 
   /*  Determina el tipo de evento del evento que debe ocurrir. */
-  // [1] 15 minutes
-  // [2] 8 minutes, 9 minutes, 6 minutes, 7.5 minutes, 6 minutes
-  // server 1
-  // type_event 2
-  // a * b *
   for (i = 0; i < num_eventos; ++i)
   {
     if (tiempo_sig_evento[i] < min_tiempo_sig_evento)
@@ -256,19 +248,21 @@ void salida(void) /* Funcion de Salida. */
 
 void reportes(void) /* Funcion generadora de reportes. */
 {
+  cout << erlang << endl;
   /* Calcula y estima los estimados de las medidas deseadas de desempe�o */
-  fprintf(resultados, "\n\nEspera promedio en la cola%11.3f minutos\n\n",
+  fprintf(resultados, "\n\nEspera promedio en la cola%11.4f minutos\n\n",
           total_de_esperas / num_clientes_espera);
-  fprintf(resultados, "Numero promedio en cola%10.3f\n\n",
+  fprintf(resultados, "Numero promedio en cola%12.4f\n\n",
           area_num_entra_cola / tiempo_simulacion);
   // Ahora este debe ser el promedio
-  for (int i = 0; i < area_estado_servidor.size(); i++)
+  for (unsigned int i = 0; i < area_estado_servidores.size(); i++)
   {
-    fprintf(resultados, "Uso del servidor %d: %15.3f\n\n", i, area_estado_servidor[i] / tiempo_simulacion);
+    fprintf(resultados, "Uso del servidor %d: %15.4f\n\n", i, area_estado_servidores[i] / tiempo_simulacion);
   }
-  double avarage_servers = accumulate(area_estado_servidor.begin(), area_estado_servidor.end(), 0.0) / area_estado_servidor.size();
-  fprintf(resultados, "Uso de los servidores: %15.3f\n\n", avarage_servers / tiempo_simulacion);
-  fprintf(resultados, "Tiempo de terminacion de la simulacion%12.3f minutos", tiempo_simulacion);
+  double avarage_servers = accumulate(area_estado_servidores.begin(), area_estado_servidores.end(), 0.0) / area_estado_servidores.size();
+  fprintf(resultados, "Uso de los servidores: %12.4f\n\n", avarage_servers / tiempo_simulacion);
+  fprintf(resultados, "Erlang-C: %25.4f\n\n", erlang / tiempo_simulacion);
+  fprintf(resultados, "Tiempo de terminacion de la simulacion%12.4f minutos", tiempo_simulacion);
 }
 
 void actualizar_estad_prom_tiempo(void) /* Actualiza los acumuladores de area para las estadisticas de tiempo promedio. */
@@ -283,12 +277,17 @@ void actualizar_estad_prom_tiempo(void) /* Actualiza los acumuladores de area pa
   /* Actualiza el area bajo la funcion de numero_en_cola */
   area_num_entra_cola += num_entra_cola * time_since_last_event;
 
-  /* Actualiza el area bajo la funcion indicadora de servidor ocupado */
+  /* Actualiza el area bajo la funcion indicadora de servidores ocupados */
   /* Hacer esto para cada servidor */
-  for (int index = 0; index < servers_status.size(); index++)
+  int is_busy = 1;
+  for (unsigned int index = 0; index < servers_status.size(); index++)
   {
-    area_estado_servidor[index] += servers_status[index] * time_since_last_event;
+    is_busy *= servers_status[index];
+    area_estado_servidores[index] += servers_status[index] * time_since_last_event;
   }
+
+  /* Actualizar el area bajo el timepo que todos los servidores estan ocupados */
+  erlang += is_busy * time_since_last_event;
 }
 
 float expon(float media) /* Funcion generadora de la exponencias */

@@ -15,7 +15,7 @@
 
 int sig_tipo_evento, num_clientes_espera, num_esperas_requerido, num_eventos,
     num_entra_cola, estado_servidor;
-float area_num_entra_cola, area_estado_servidor, media_entre_llegadas, media_atencion,
+float area_num_entra_cola, area_estado_servidores, media_entre_llegadas, media_atencion,
     tiempo_simulacion, queue_arrivals[LIMITE_COLA + 1], tiempo_ultimo_evento, tiempo_sig_evento[3],
     total_de_esperas, tiempo_i0, tiempo_i1;
 
@@ -104,7 +104,7 @@ void inicializar(void) /* Funcion de inicializacion. */
   num_clientes_espera = 0;
   total_de_esperas = 0.0;
   area_num_entra_cola = 0.0;
-  area_estado_servidor = 0.0;
+  area_estado_servidores = 0.0;
   tiempo_i0 = 0.0;
   tiempo_i1 = 0.0;
 
@@ -232,7 +232,7 @@ void reportes(void) /* Funcion generadora de reportes. */
   fprintf(resultados, "Numero promedio en cola%10.3f\n\n",
           area_num_entra_cola / tiempo_simulacion);
   fprintf(resultados, "Uso del servidor%15.3f\n\n",
-          area_estado_servidor / tiempo_simulacion);
+          area_estado_servidores / tiempo_simulacion);
   fprintf(resultados, "Tiempo de terminacion de la simulacion%12.3f minutos", tiempo_simulacion);
 }
 
@@ -250,7 +250,7 @@ void actualizar_estad_prom_tiempo(void) /* Actualiza los acumuladores de
   area_num_entra_cola += num_entra_cola * time_since_last_event;
 
   /*Actualiza el area bajo la funcion indicadora de servidor ocupado*/
-  area_estado_servidor += estado_servidor * time_since_last_event;
+  area_estado_servidores += estado_servidor * time_since_last_event;
 }
 
 float expon(float media) /* Funcion generadora de la exponencias */
