@@ -12,76 +12,43 @@ using namespace std;
 
 int main(void)
 {
+  for (int i = 0; i < 5; i++)
+  {
+    cout << i << endl;
+  }
   // decleration of int vector
-  vector<int> vec = {1, 2, 3, 4, 5};
-  int vecSize = vec.size(); // returns length of vector
+  // vector<int> vec = {1, 2, 3, 4, 5};
+  // vector<float> test;
+  // test.push_back(3.0);
+  // test.push_back(221.0);
+  // cout << test[0] << " " << test[1] << " " << test[2] << endl;
+  // int vecSize = vec.size(); // returns length of vector
 
-  // decleration of vector iterator
-  vector<int>::iterator iter = vec.begin();
+  // // decleration of vector iterator
+  // vector<int>::iterator iter = vec.begin();
 
-  cout << "Vector: ";
+  // cout << "Vector: ";
 
-  // run for loop from 0 to vecSize
-  for (iter; iter < vec.end(); iter++)
-  {
-    // access value in the memory to which the pointer
-    // is referencing
-    cout << *iter << " ";
-  }
-  cout << endl;
-
-  int test = vec.front();
-  vec.erase(vec.begin());
-  iter = vec.begin();
-  // run for loop from 0 to vecSize
-  for (iter; iter < vec.end(); iter++)
-  {
-    // access value in the memory to which the pointer
-    // is referencing
-    cout << *iter << " ";
-  }
-  cout << endl;
-
-  // test[0] = 0.0f;
-  // for (int i = 1; i < row + servers - 1; i++)
+  // // run for loop from 0 to vecSize
+  // for (iter; iter < vec.end(); iter++)
   // {
-  //   test[i] = 3.0e+10;
+  //   // access value in the memory to which the pointer
+  //   // is referencing
+  //   cout << *iter << " ";
   // }
-  // for (int i = 0; i < row + servers - 1; i++)
+  // cout << endl;
+
+  // int test = vec.front();
+  // vec.erase(vec.begin());
+  // iter = vec.begin();
+  // // run for loop from 0 to vecSize
+  // for (iter; iter < vec.end(); iter++)
   // {
-  //   cout << test[i] << " ";
+  //   // access value in the memory to which the pointer
+  //   // is referencing
+  //   cout << *iter << " ";
   // }
+  // cout << endl;
 
-  // float min_tiempo_sig_evento = 1.0e+29;
-  // for (int i = 0; i < row + servers - 1; ++i)
-  // {
-  //   if (tiempo_sig_evento[i] < min_tiempo_sig_evento)
-  //   {
-  //     min_tiempo_sig_evento = tiempo_sig_evento[i];
-  //     sig_tipo_evento = (i > row) ? 1 : 0;
-  //   }
-  // }
-
-  // int row = 2;
-
-  // float **test;
-  // test = new float *[row];
-  // test[0] = new float;
-  // test[1] = new float[3];
-
-  // test[0][0] = 5.5f;
-  // test[1][0] = 6.5f;
-  // test[1][0] = 7.5f;
-  // int length = sizeof(test[0]);
-  // int prueba = sizeof(float);
-  // cout << length << ' ' << prueba << endl;
-  // // for (int i = 0; i < length; i++){
-
-  // // }
-
-  // for (int i = 0; i < row; i++)
-  // {
-  //   delete[] test[i];
-  // }
   return 0;
 }

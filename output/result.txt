@@ -1,4 +1,4 @@
-Sistema de Colas Simple
+Sistema de Colas Simple Modelo (M/M/c)
 
 Tiempo promedio de llegada      8.700 segundos
 
@@ -6,12 +6,26 @@ Tiempo promedio de atencion           6.100 segundos
 
 Numero de clientes          1000
 
+Numero de servidores           5
 
 
-Espera promedio en la cola     15.284 segundos
 
-Numero promedio en cola     1.771
+Espera promedio en la cola     0.0023 segundos
 
-Uso del servidor          0.694
+Numero promedio en cola      0.0003
 
-Tiempo de terminacion de la simulacion    8628.015 segundos
+Uso del servidor 0:          0.3914
+
+Uso del servidor 1:          0.1838
+
+Uso del servidor 2:          0.0674
+
+Uso del servidor 3:          0.0172
+
+Uso del servidor 4:          0.0032
+
+Uso de los servidores:       0.1326
+
+Erlang-C:                  0.000980
+
+Tiempo de terminacion de la simulacion   8821.5732 segundos
