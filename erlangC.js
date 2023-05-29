@@ -1,8 +1,10 @@
-const betaArrivla = 8.7;
+// parametros para cambiar
+const betaArrival = 8.7;
 const betaDeparture = 6.1;
-const lambda = 1 / betaArrivla;
-const mu = 1 / betaDeparture;
 const servers = 5;
+
+const lambda = 1 / betaArrival;
+const mu = 1 / betaDeparture;
 
 const a = 1 / factorial(servers);
 const b = (lambda / mu) ** servers;
@@ -16,7 +18,7 @@ for (var n = 1; n < servers; n++) {
 
 const erlang = (a * b * ro) / (1 + sum + a * b * ro);
 
-console.log("Erlang Nuestro: ", erlang);
+console.log("Erlang teorico: ", erlang);
 
 //functions
 function factorial(n) {
